@@ -33,12 +33,11 @@
     .add { background: #e0ffe0; color: #0a5c0a; }
     .label { font-weight: bold; margin-bottom: 4px; display: inline-flex; align-items: center; gap: 6px; }
     .advice-area { margin-top: 16px; display: grid; grid-template-columns: 3fr 1fr; gap: 12px; align-items: start; }
-    .advice-area textarea { min-height: 260px; } /* アドバイス欄を縦長 */
+    .advice-area textarea { min-height: 260px; }
     .advice-view { padding: 8px; min-height: 260px; background: #fff; border: 1px solid #ccc; white-space: pre-wrap; }
     .score-input { width: 100%; padding: 8px; font-size: 16px; }
     .controls { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
     .readonly-note { margin-bottom: 8px; color: #b00; font-weight: bold; }
-    /* 閲覧モード用に色を薄くしない */
     .readonly-field { background: #fff; color: #111; opacity: 1; }
     .copy-btn { padding: 4px 10px; font-size: 13px; }
   </style>
@@ -61,24 +60,24 @@
 
   <div class="container">
     <div>
-      <span class="label">修正後（新しい文章）
-        <button id="copyLeftBtn" class="copy-btn">全文コピー</button>
-      </span>
-      <textarea id="leftInput" placeholder="修正後（新しい文章）"></textarea>
-    </div>
-    <div>
       <span class="label">元の文章（オリジナル）
         <button id="copyRightBtn" class="copy-btn">全文コピー</button>
       </span>
       <textarea id="rightInput" placeholder="元の文章（オリジナル）"></textarea>
+    </div>
+    <div>
+      <span class="label">修正後（新しい文章）
+        <button id="copyLeftBtn" class="copy-btn">全文コピー</button>
+      </span>
+      <textarea id="leftInput" placeholder="修正後（新しい文章）"></textarea>
     </div>
   </div>
 
   <p><button id="diffBtn">差分を表示</button></p>
 
   <div class="container">
-    <div><div id="leftResult" class="result-box"></div></div>
     <div><div id="rightResult" class="result-box"></div></div>
+    <div><div id="leftResult" class="result-box"></div></div>
   </div>
 
   <div class="advice-area">
@@ -97,8 +96,8 @@
 
   <script src="https://unpkg.com/diff-match-patch@1.0.5/index.js"></script>
   <script>
-    const leftInput   = document.getElementById('leftInput');
-    const rightInput  = document.getElementById('rightInput');
+    const leftInput   = document.getElementById('leftInput');   // 修正後
+    const rightInput  = document.getElementById('rightInput');  // 元の文章
     const leftResult  = document.getElementById('leftResult');
     const rightResult = document.getElementById('rightResult');
     const adviceInput = document.getElementById('adviceInput');
@@ -121,7 +120,6 @@
 
     const dmp = new diff_match_patch();
 
-    // 編集権限: URLに ?edit=1 があるときのみ編集可。インポート & コピーは閲覧モードでも可。
     const isEditor = new URLSearchParams(location.search).get('edit') === '1';
     if (!isEditor) {
       readonlyNote.style.display = 'block';
@@ -164,7 +162,7 @@
 
     function createTab(name) {
       const id = crypto.randomUUID();
-      const tabName = name && name.trim() ? name.trim() : todayStr(); // 空なら日付を自動セット
+      const tabName = name && name.trim() ? name.trim() : todayStr();
       tabs.push({ id, name: tabName, left:'', right:'', advice:'', score:'' });
       activeId = id;
       renderTabs();
@@ -185,7 +183,7 @@
       if (!confirm('すべてのタブを削除してよいですか？（元に戻せません）')) return;
       tabs = [];
       activeId = null;
-      createTab(todayStr()); // 初期タブを当日の日付で再生成
+      createTab(todayStr());
       persistAll();
     }
 
@@ -268,7 +266,6 @@
       adviceView.textContent = adviceInput.value;
     }
 
-    // クリップボードコピー共通
     async function copyText(text, fallbackMsg) {
       try {
         await navigator.clipboard.writeText(text);
@@ -284,12 +281,10 @@
       }
     }
 
-    // コピー（閲覧モードでも可）
     copyAdviceBtn.addEventListener('click', () => copyText(adviceInput.value, 'アドバイス全文をコピーしました（フォールバック）'));
     copyLeftBtn.addEventListener('click', () => copyText(leftInput.value, '修正後全文をコピーしました（フォールバック）'));
     copyRightBtn.addEventListener('click', () => copyText(rightInput.value, '元の文章全文をコピーしました（フォールバック）'));
 
-    // 入力イベント
     document.getElementById('diffBtn').addEventListener('click', () => { if (isEditor) renderDiff(); });
     leftInput.addEventListener('input',  () => { if (isEditor) saveActiveTab(); });
     rightInput.addEventListener('input', () => { if (isEditor) saveActiveTab(); });
@@ -313,7 +308,7 @@
 
     listTabsBtn.addEventListener('click', () => {
       const list = tabs.map((t, i) => `${i + 1}. ${t.name}`).join('\n');
-      const sel = prompt(`タブ番号を入力するとそのタブに移動します:\n${list}`);
+      const sel = prompt(`タブ番号を入力する��そのタブに移動します:\n${list}`);
       if (!sel) return;
       const idx = Number(sel) - 1;
       if (Number.isInteger(idx) && idx >= 0 && idx < tabs.length) {
@@ -328,7 +323,6 @@
 
     deleteAllBtn.addEventListener('click', deleteAllTabs);
 
-    // エクスポート（JSONダウンロード）※編集モードのみ
     exportBtn.addEventListener('click', () => {
       if (!isEditor) return;
       const blob = new Blob([JSON.stringify({ tabs, activeId }, null, 2)], { type: 'application/json' });
@@ -340,7 +334,6 @@
       URL.revokeObjectURL(url);
     });
 
-    // インポート（閲覧モードでも可）
     importBtn.addEventListener('click', () => {
       importFile.click();
     });
@@ -367,7 +360,6 @@
       importFile.value = '';
     });
 
-    // 初期化
     if (!restoreAll()) {
       createTab(todayStr());
     } else {
