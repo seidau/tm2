@@ -33,10 +33,12 @@
     .add { background: #e0ffe0; color: #0a5c0a; }
     .label { font-weight: bold; margin-bottom: 4px; display: block; }
     .advice-area { margin-top: 16px; display: grid; grid-template-columns: 3fr 1fr; gap: 12px; }
-    .advice-area textarea { min-height: 120px; }
+    .advice-area textarea { min-height: 260px; } /* アドバイス欄を縦長に */
     .score-input { width: 100%; padding: 8px; font-size: 16px; }
     .controls { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
     .readonly-note { margin-bottom: 8px; color: #b00; font-weight: bold; }
+    /* 閲覧モード用に色を薄くしない */
+    .readonly-field { background: #fff; color: #111; opacity: 1; }
   </style>
 </head>
 <body>
@@ -100,13 +102,17 @@
 
     const dmp = new diff_match_patch();
 
-    // 編集権限: URLに ?edit=1 があるときのみ編集可。インポートだけは閲覧モードでも許可。
+    // 編集権限: URLに ?edit=1 があるときのみ編集可。インポートは閲覧モードでも可。
     const isEditor = new URLSearchParams(location.search).get('edit') === '1';
     if (!isEditor) {
       readonlyNote.style.display = 'block';
-      [leftInput, rightInput, adviceInput, scoreInput, newTabName].forEach(el => el.disabled = true);
+      // 編集不可にするが、アドバイス・点数は薄くしないよう readOnly + CSS
+      [leftInput, rightInput, newTabName].forEach(el => el.disabled = true);
       [addTabBtn, diffBtn, renameTabBtn, deleteAllBtn, exportBtn].forEach(el => el.disabled = true);
-      // importBtn/importFile は有効のまま
+      [adviceInput, scoreInput].forEach(el => {
+        el.readOnly = true;
+        el.classList.add('readonly-field');
+      });
     }
 
     const STORAGE_KEY = 'diff-tabs-v1';
