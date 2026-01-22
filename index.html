@@ -2,10 +2,11 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>小説添削・差分ビュー（タブ＋自動保存）</title>
+  <title>小説添削・差分ビュー（タブ＋自動保存＋エクスポート/インポート）</title>
   <style>
     body { font-family: system-ui, sans-serif; margin: 16px; background: #f8f9fb; }
     h1 { margin-top: 0; }
+    /* タブは1行のみ表示。はみ出しは横スクロール */
     .tabbar {
       display: flex;
       flex-wrap: nowrap;
@@ -48,6 +49,9 @@
     <button id="renameTabBtn">タブ名を変更（アクティブ）</button>
     <button id="listTabsBtn">タブ一覧/移動</button>
     <button id="deleteAllBtn" style="color:#b00;">タブを全削除</button>
+    <button id="exportBtn">エクスポート(JSON)</button>
+    <button id="importBtn">インポート(JSON)</button>
+    <input id="importFile" type="file" accept="application/json" style="display:none;" />
   </div>
   <div id="tabBar" class="tabbar"></div>
 
@@ -90,6 +94,9 @@
     const deleteAllBtn  = document.getElementById('deleteAllBtn');
     const newTabName    = document.getElementById('newTabName');
     const readonlyNote  = document.getElementById('readonlyNote');
+    const exportBtn     = document.getElementById('exportBtn');
+    const importBtn     = document.getElementById('importBtn');
+    const importFile    = document.getElementById('importFile');
 
     const dmp = new diff_match_patch();
 
@@ -97,8 +104,8 @@
     const isEditor = new URLSearchParams(location.search).get('edit') === '1';
     if (!isEditor) {
       readonlyNote.style.display = 'block';
-      [leftInput, rightInput, adviceInput, scoreInput, newTabName].forEach(el => el.disabled = true);
-      [addTabBtn, diffBtn, renameTabBtn, deleteAllBtn].forEach(el => el.disabled = true);
+      [leftInput, rightInput, adviceInput, scoreInput, newTabName, importBtn, importFile].forEach(el => el.disabled = true);
+      [addTabBtn, diffBtn, renameTabBtn, deleteAllBtn, exportBtn].forEach(el => el.disabled = true);
     }
 
     const STORAGE_KEY = 'diff-tabs-v1';
@@ -173,7 +180,7 @@
           if (!confirm(`「${t.name}」タブを削除してよいですか？`)) return;
           const idx = tabs.findIndex(x => x.id === t.id);
           tabs.splice(idx, 1);
-          if (activeId === t.id) activeId = tabs[Math.max(0, idx - 1)].id;
+          if (activeId === t.id) activeId = tabs[Math.max(0, idx - 1)]?.id || (tabs[0] && tabs[0].id);
           loadActiveTab();
           renderTabs();
           persistAll();
@@ -230,6 +237,7 @@
       }[s]));
     }
 
+    // 入力イベント
     document.getElementById('diffBtn').addEventListener('click', () => { if (isEditor) renderDiff(); });
     leftInput.addEventListener('input',  () => { if (isEditor) saveActiveTab(); });
     rightInput.addEventListener('input', () => { if (isEditor) saveActiveTab(); });
@@ -253,7 +261,7 @@
 
     listTabsBtn.addEventListener('click', () => {
       const list = tabs.map((t, i) => `${i + 1}. ${t.name}`).join('\n');
-      const sel = prompt(`タブ番号を入力するとそのタブに移動します:\n${list}`);
+      const sel = prompt(`タブ番号を��力するとそのタブに移動します:\n${list}`);
       if (!sel) return;
       const idx = Number(sel) - 1;
       if (Number.isInteger(idx) && idx >= 0 && idx < tabs.length) {
@@ -267,6 +275,47 @@
     });
 
     deleteAllBtn.addEventListener('click', deleteAllTabs);
+
+    // エクスポート（JSONダウンロード）
+    exportBtn.addEventListener('click', () => {
+      if (!isEditor) return;
+      const blob = new Blob([JSON.stringify({ tabs, activeId }, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'tamotsu-tabs.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // インポート（JSON読み込み）
+    importBtn.addEventListener('click', () => {
+      if (!isEditor) return;
+      importFile.click();
+    });
+
+    importFile.addEventListener('change', (e) => {
+      if (!isEditor) return;
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const data = JSON.parse(reader.result);
+          if (!data.tabs || !Array.isArray(data.tabs) || data.tabs.length === 0) throw new Error('invalid');
+          tabs = data.tabs;
+          activeId = data.activeId || tabs[0].id;
+          renderTabs();
+          loadActiveTab();
+          persistAll();
+          alert('インポートしました');
+        } catch (err) {
+          alert('インポートに失敗しました（ファイル形式を確認してください）');
+        }
+      };
+      reader.readAsText(file);
+      importFile.value = '';
+    });
 
     // 初期化
     if (!restoreAll()) {
