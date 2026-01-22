@@ -6,7 +6,6 @@
   <style>
     body { font-family: system-ui, sans-serif; margin: 16px; background: #f8f9fb; }
     h1 { margin-top: 0; }
-    /* タブは1行のみ表示。はみ出しは横スクロール */
     .tabbar {
       display: flex;
       flex-wrap: nowrap;
@@ -60,16 +59,16 @@
 
   <div class="container">
     <div>
-      <span class="label">修正後（新しい文章）
+      <span class="label">たもつの文章
         <button id="copyLeftBtn" class="copy-btn">全文コピー</button>
       </span>
-      <textarea id="leftInput" placeholder="修正後（新しい文章）"></textarea>
+      <textarea id="leftInput" placeholder="たもつの文章"></textarea>
     </div>
     <div>
-      <span class="label">元の文章（オリジナル）
+      <span class="label">添削後
         <button id="copyRightBtn" class="copy-btn">全文コピー</button>
       </span>
-      <textarea id="rightInput" placeholder="元の文章（オリジナル）"></textarea>
+      <textarea id="rightInput" placeholder="添削後"></textarea>
     </div>
   </div>
 
@@ -96,8 +95,8 @@
 
   <script src="https://unpkg.com/diff-match-patch@1.0.5/index.js"></script>
   <script>
-    const leftInput   = document.getElementById('leftInput');   // 修正後
-    const rightInput  = document.getElementById('rightInput');  // 元の文章
+    const leftInput   = document.getElementById('leftInput');   // たもつの文章（修正後）
+    const rightInput  = document.getElementById('rightInput');  // 添削後（元の文章枠だったが表示文言のみ変更）
     const leftResult  = document.getElementById('leftResult');
     const rightResult = document.getElementById('rightResult');
     const adviceInput = document.getElementById('adviceInput');
@@ -282,8 +281,8 @@
     }
 
     copyAdviceBtn.addEventListener('click', () => copyText(adviceInput.value, 'アドバイス全文をコピーしました（フォールバック）'));
-    copyLeftBtn.addEventListener('click', () => copyText(leftInput.value, '修正後全文をコピーしました（フォールバック）'));
-    copyRightBtn.addEventListener('click', () => copyText(rightInput.value, '元の文章全文をコピーしました（フォールバック）'));
+    copyLeftBtn.addEventListener('click', () => copyText(leftInput.value, 'たもつの文章をコピーしました（フォールバック）'));
+    copyRightBtn.addEventListener('click', () => copyText(rightInput.value, '添削後をコピーしました（フォールバック）'));
 
     document.getElementById('diffBtn').addEventListener('click', () => { if (isEditor) renderDiff(); });
     leftInput.addEventListener('input',  () => { if (isEditor) saveActiveTab(); });
@@ -308,7 +307,7 @@
 
     listTabsBtn.addEventListener('click', () => {
       const list = tabs.map((t, i) => `${i + 1}. ${t.name}`).join('\n');
-      const sel = prompt(`タブ番号を入力する��そのタブに移動します:\n${list}`);
+      const sel = prompt(`タブ番号を入力するとそのタブに移動します:\n${list}`);
       if (!sel) return;
       const idx = Number(sel) - 1;
       if (Number.isInteger(idx) && idx >= 0 && idx < tabs.length) {
