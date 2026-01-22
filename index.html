@@ -60,24 +60,24 @@
 
   <div class="container">
     <div>
-      <span class="label">元の文章（オリジナル）
-        <button id="copyRightBtn" class="copy-btn">全文コピー</button>
-      </span>
-      <textarea id="rightInput" placeholder="元の文章（オリジナル）"></textarea>
-    </div>
-    <div>
       <span class="label">修正後（新しい文章）
         <button id="copyLeftBtn" class="copy-btn">全文コピー</button>
       </span>
       <textarea id="leftInput" placeholder="修正後（新しい文章）"></textarea>
+    </div>
+    <div>
+      <span class="label">元の文章（オリジナル）
+        <button id="copyRightBtn" class="copy-btn">全文コピー</button>
+      </span>
+      <textarea id="rightInput" placeholder="元の文章（オリジナル）"></textarea>
     </div>
   </div>
 
   <p><button id="diffBtn">差分を表示</button></p>
 
   <div class="container">
-    <div><div id="rightResult" class="result-box"></div></div>
     <div><div id="leftResult" class="result-box"></div></div>
+    <div><div id="rightResult" class="result-box"></div></div>
   </div>
 
   <div class="advice-area">
