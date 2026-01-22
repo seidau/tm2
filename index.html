@@ -100,12 +100,13 @@
 
     const dmp = new diff_match_patch();
 
-    // 編集権限: URLに ?edit=1 があるときのみ編集可
+    // 編集権限: URLに ?edit=1 があるときのみ編集可。インポートだけは閲覧モードでも許可。
     const isEditor = new URLSearchParams(location.search).get('edit') === '1';
     if (!isEditor) {
       readonlyNote.style.display = 'block';
-      [leftInput, rightInput, adviceInput, scoreInput, newTabName, importBtn, importFile].forEach(el => el.disabled = true);
+      [leftInput, rightInput, adviceInput, scoreInput, newTabName].forEach(el => el.disabled = true);
       [addTabBtn, diffBtn, renameTabBtn, deleteAllBtn, exportBtn].forEach(el => el.disabled = true);
+      // importBtn/importFile は有効のまま
     }
 
     const STORAGE_KEY = 'diff-tabs-v1';
@@ -261,7 +262,7 @@
 
     listTabsBtn.addEventListener('click', () => {
       const list = tabs.map((t, i) => `${i + 1}. ${t.name}`).join('\n');
-      const sel = prompt(`タブ番号を��力するとそのタブに移動します:\n${list}`);
+      const sel = prompt(`タブ番号を入力するとそのタブに移動します:\n${list}`);
       if (!sel) return;
       const idx = Number(sel) - 1;
       if (Number.isInteger(idx) && idx >= 0 && idx < tabs.length) {
@@ -276,7 +277,7 @@
 
     deleteAllBtn.addEventListener('click', deleteAllTabs);
 
-    // エクスポート（JSONダウンロード）
+    // エクスポート（JSONダウンロード）※編集モードのみ
     exportBtn.addEventListener('click', () => {
       if (!isEditor) return;
       const blob = new Blob([JSON.stringify({ tabs, activeId }, null, 2)], { type: 'application/json' });
@@ -288,14 +289,12 @@
       URL.revokeObjectURL(url);
     });
 
-    // インポート（JSON読み込み）
+    // インポート（閲覧モードでも可）
     importBtn.addEventListener('click', () => {
-      if (!isEditor) return;
       importFile.click();
     });
 
     importFile.addEventListener('change', (e) => {
-      if (!isEditor) return;
       const file = e.target.files?.[0];
       if (!file) return;
       const reader = new FileReader();
