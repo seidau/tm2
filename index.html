@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>小説添削・差分ビュー（タブ＋自動保存）</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 16px; background: #f8f9fb; }
+    h1 { margin-top: 0; }
+    .tabbar {
+      display: flex;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .tab {
+      padding: 6px 10px;
+      border: 1px solid #ccc;
+      background: #fff;
+      cursor: pointer;
+      border-radius: 6px;
+      flex: 0 0 auto;
+    }
+    .tab.active { background: #dfefff; border-color: #5b8def; }
+    .tab button { margin-left: 6px; border: none; background: transparent; cursor: pointer; color: #b00; }
+    .tab button:disabled { color: #ccc; cursor: not-allowed; }
+    .container { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    textarea { width: 100%; min-height: 240px; padding: 8px; font-size: 14px; }
+    button { padding: 8px 14px; font-size: 14px; }
+    .result-box { padding: 8px; min-height: 200px; background: #fff; border: 1px solid #ccc; white-space: pre-wrap; }
+    .del { background: #ffe0e0; color: #b00; }
+    .add { background: #e0ffe0; color: #0a5c0a; }
+    .label { font-weight: bold; margin-bottom: 4px; display: block; }
+    .advice-area { margin-top: 16px; display: grid; grid-template-columns: 3fr 1fr; gap: 12px; }
+    .advice-area textarea { min-height: 120px; }
+    .score-input { width: 100%; padding: 8px; font-size: 16px; }
+    .controls { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+    .readonly-note { margin-bottom: 8px; color: #b00; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>＜たもつ専用添削サイト＞</h1>
+
+  <div id="readonlyNote" class="readonly-note" style="display:none;">閲覧モード（編集不可）</div>
+  <div class="controls">
+    <input id="newTabName" type="text" placeholder="新しいタブ名（空なら日付を自動セット）" />
+    <button id="addTabBtn">タブを追加</button>
+    <button id="renameTabBtn">タブ名を変更（アクティブ）</button>
+    <button id="listTabsBtn">タブ一覧/移動</button>
+    <button id="deleteAllBtn" style="color:#b00;">タブを全削除</button>
+  </div>
+  <div id="tabBar" class="tabbar"></div>
+
+  <div class="container">
+    <div><textarea id="leftInput" placeholder="修正後（新しい文章）"></textarea></div>
+    <div><textarea id="rightInput" placeholder="元の文章（オリジナル）"></textarea></div>
+  </div>
+
+  <p><button id="diffBtn">差分を表示</button></p>
+
+  <div class="container">
+    <div><div id="leftResult" class="result-box"></div></div>
+    <div><div id="rightResult" class="result-box"></div></div>
+  </div>
+
+  <div class="advice-area">
+    <div>
+      <span class="label">アドバイス</span>
+      <textarea id="adviceInput" placeholder="ここにアドバイスを記入"></textarea>
+    </div>
+    <div>
+      <span class="label">点数</span>
+      <input id="scoreInput" class="score-input" type="text" placeholder="例: 85/100" />
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/diff-match-patch@1.0.5/index.js"></script>
+  <script>
+    const leftInput   = document.getElementById('leftInput');
+    const rightInput  = document.getElementById('rightInput');
+    const leftResult  = document.getElementById('leftResult');
+    const rightResult = document.getElementById('rightResult');
+    const adviceInput = document.getElementById('adviceInput');
+    const scoreInput  = document.getElementById('scoreInput');
+
+    const tabBar        = document.getElementById('tabBar');
+    const addTabBtn     = document.getElementById('addTabBtn');
+    const renameTabBtn  = document.getElementById('renameTabBtn');
+    const listTabsBtn   = document.getElementById('listTabsBtn');
+    const deleteAllBtn  = document.getElementById('deleteAllBtn');
+    const newTabName    = document.getElementById('newTabName');
+    const readonlyNote  = document.getElementById('readonlyNote');
+
+    const dmp = new diff_match_patch();
+
+    // 編集権限: URLに ?edit=1 があるときのみ編集可
+    const isEditor = new URLSearchParams(location.search).get('edit') === '1';
+    if (!isEditor) {
+      readonlyNote.style.display = 'block';
+      [leftInput, rightInput, adviceInput, scoreInput, newTabName].forEach(el => el.disabled = true);
+      [addTabBtn, diffBtn, renameTabBtn, deleteAllBtn].forEach(el => el.disabled = true);
+    }
+
+    const STORAGE_KEY = 'diff-tabs-v1';
+    let tabs = [];
+    let activeId = null;
+
+    const todayStr = () => {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    };
+
+    function persistAll() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify({ tabs, activeId })); } catch (e) {}
+    }
+
+    function restoreAll() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return false;
+      try {
+        const payload = JSON.parse(raw);
+        if (!payload.tabs || !Array.isArray(payload.tabs) || payload.tabs.length === 0) return false;
+        tabs = payload.tabs;
+        activeId = payload.activeId || tabs[0].id;
+        return true;
+      } catch (e) { return false; }
+    }
+
+    function createTab(name) {
+      const id = crypto.randomUUID();
+      const tabName = name && name.trim() ? name.trim() : todayStr(); // 空なら日付を自動セット
+      tabs.push({ id, name: tabName, left:'', right:'', advice:'', score:'' });
+      activeId = id;
+      renderTabs();
+      loadActiveTab();
+      persistAll();
+    }
+
+    function renameActiveTab(newName) {
+      const t = tabs.find(x => x.id === activeId);
+      if (!t || !newName) return;
+      t.name = newName;
+      renderTabs();
+      persistAll();
+    }
+
+    function deleteAllTabs() {
+      if (!isEditor) return;
+      if (!confirm('すべてのタブを削除してよいですか？（元に戻せません）')) return;
+      tabs = [];
+      activeId = null;
+      createTab(todayStr()); // 初期タブを当日の日付で再生成
+      persistAll();
+    }
+
+    function renderTabs() {
+      tabBar.innerHTML = '';
+      tabs.forEach(t => {
+        const el = document.createElement('div');
+        el.className = 'tab' + (t.id === activeId ? ' active' : '');
+        el.textContent = t.name;
+        el.onclick = () => { saveActiveTab(); activeId = t.id; loadActiveTab(); renderTabs(); };
+
+        const closeBtn = document.createElement('button');
+        closeBtn.textContent = '×';
+        closeBtn.disabled = !isEditor || tabs.length === 1;
+        closeBtn.onclick = (e) => {
+          e.stopPropagation();
+          if (!isEditor || tabs.length === 1) return;
+          if (!confirm(`「${t.name}」タブを削除してよいですか？`)) return;
+          const idx = tabs.findIndex(x => x.id === t.id);
+          tabs.splice(idx, 1);
+          if (activeId === t.id) activeId = tabs[Math.max(0, idx - 1)].id;
+          loadActiveTab();
+          renderTabs();
+          persistAll();
+        };
+        el.appendChild(closeBtn);
+        tabBar.appendChild(el);
+      });
+    }
+
+    function loadActiveTab() {
+      const t = tabs.find(x => x.id === activeId);
+      if (!t) return;
+      leftInput.value   = t.left;
+      rightInput.value  = t.right;
+      adviceInput.value = t.advice;
+      scoreInput.value  = t.score;
+      renderDiff();
+    }
+
+    function saveActiveTab() {
+      const t = tabs.find(x => x.id === activeId);
+      if (!t) return;
+      t.left   = leftInput.value;
+      t.right  = rightInput.value;
+      t.advice = adviceInput.value;
+      t.score  = scoreInput.value;
+      persistAll();
+    }
+
+    function renderDiff() {
+      const diff = dmp.diff_main(leftInput.value, rightInput.value);
+      dmp.diff_cleanupSemantic(diff);
+
+      const leftHtml = diff.map(([op, data]) => {
+        if (op === -1) return `<span class="del">${escapeHtml(data)}</span>`;
+        if (op === 0)  return escapeHtml(data);
+        return '';
+      }).join('');
+
+      const rightHtml = diff.map(([op, data]) => {
+        if (op === 1)  return `<span class="add">${escapeHtml(data)}</span>`;
+        if (op === -1) return '';
+        return escapeHtml(data);
+      }).join('');
+
+      leftResult.innerHTML  = leftHtml;
+      rightResult.innerHTML = rightHtml;
+      saveActiveTab();
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>"']/g, s => ({
+        '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+      }[s]));
+    }
+
+    document.getElementById('diffBtn').addEventListener('click', () => { if (isEditor) renderDiff(); });
+    leftInput.addEventListener('input',  () => { if (isEditor) saveActiveTab(); });
+    rightInput.addEventListener('input', () => { if (isEditor) saveActiveTab(); });
+    adviceInput.addEventListener('input',() => { if (isEditor) saveActiveTab(); });
+    scoreInput.addEventListener('input', () => { if (isEditor) saveActiveTab(); });
+
+    addTabBtn.addEventListener('click', () => {
+      if (!isEditor) return;
+      saveActiveTab();
+      createTab(newTabName.value);
+      newTabName.value = '';
+    });
+
+    renameTabBtn.addEventListener('click', () => {
+      if (!isEditor) return;
+      const t = tabs.find(x => x.id === activeId);
+      if (!t) return;
+      const newName = prompt('新しいタブ名を入力してください', t.name);
+      if (newName && newName.trim()) renameActiveTab(newName.trim());
+    });
+
+    listTabsBtn.addEventListener('click', () => {
+      const list = tabs.map((t, i) => `${i + 1}. ${t.name}`).join('\n');
+      const sel = prompt(`タブ番号を入力するとそのタブに移動します:\n${list}`);
+      if (!sel) return;
+      const idx = Number(sel) - 1;
+      if (Number.isInteger(idx) && idx >= 0 && idx < tabs.length) {
+        saveActiveTab();
+        activeId = tabs[idx].id;
+        loadActiveTab();
+        renderTabs();
+      } else {
+        alert('無効な番号です');
+      }
+    });
+
+    deleteAllBtn.addEventListener('click', deleteAllTabs);
+
+    // 初期化
+    if (!restoreAll()) {
+      createTab(todayStr());
+    } else {
+      renderTabs();
+      if (!tabs.find(t => t.id === activeId) && tabs.length > 0) activeId = tabs[0].id;
+      loadActiveTab();
+    }
+  </script>
+</body>
+</html>
