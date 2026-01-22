@@ -32,7 +32,7 @@
     .del { background: #ffe0e0; color: #b00; }
     .add { background: #e0ffe0; color: #0a5c0a; }
     .label { font-weight: bold; margin-bottom: 4px; display: block; }
-    .advice-area { margin-top: 16px; display: grid; grid-template-columns: 3fr 1fr; gap: 12px; }
+    .advice-area { margin-top: 16px; display: grid; grid-template-columns: 3fr 1fr; gap: 12px; align-items: start; }
     .advice-area textarea { min-height: 260px; } /* アドバイス欄を縦長 */
     .advice-view { padding: 8px; min-height: 260px; background: #fff; border: 1px solid #ccc; white-space: pre-wrap; }
     .score-input { width: 100%; padding: 8px; font-size: 16px; }
@@ -40,6 +40,7 @@
     .readonly-note { margin-bottom: 8px; color: #b00; font-weight: bold; }
     /* 閲覧モード用に色を薄くしない */
     .readonly-field { background: #fff; color: #111; opacity: 1; }
+    .copy-btn { margin-left: 8px; padding: 4px 10px; font-size: 13px; }
   </style>
 </head>
 <body>
@@ -72,7 +73,9 @@
 
   <div class="advice-area">
     <div>
-      <span class="label">アドバイス</span>
+      <span class="label">アドバイス
+        <button id="copyAdviceBtn" class="copy-btn">全文��ピー</button>
+      </span>
       <textarea id="adviceInput" placeholder="ここにアドバイスを記入"></textarea>
       <div id="adviceView" class="advice-view"></div>
     </div>
@@ -102,10 +105,11 @@
     const exportBtn     = document.getElementById('exportBtn');
     const importBtn     = document.getElementById('importBtn');
     const importFile    = document.getElementById('importFile');
+    const copyAdviceBtn = document.getElementById('copyAdviceBtn');
 
     const dmp = new diff_match_patch();
 
-    // 編集権限: URLに ?edit=1 があるときのみ編集可。インポートは閲覧モードでも可。
+    // 編集権限: URLに ?edit=1 があるときのみ編集可。インポート & コピーは閲覧モードでも可。
     const isEditor = new URLSearchParams(location.search).get('edit') === '1';
     if (!isEditor) {
       readonlyNote.style.display = 'block';
@@ -115,6 +119,7 @@
         el.readOnly = true;
         el.classList.add('readonly-field');
       });
+      // copyAdviceBtn / importBtn は有効のまま
     }
 
     const STORAGE_KEY = 'diff-tabs-v1';
@@ -251,6 +256,23 @@
       adviceView.textContent = adviceInput.value;
     }
 
+    // コピー（閲覧モードでも可）
+    copyAdviceBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(adviceInput.value);
+        alert('アドバイス全文をコピーしました');
+      } catch (e) {
+        // クリップボード API が使えない場合のフォールバック
+        const tmp = document.createElement('textarea');
+        tmp.value = adviceInput.value;
+        document.body.appendChild(tmp);
+        tmp.select();
+        document.execCommand('copy');
+        document.body.removeChild(tmp);
+        alert('アドバイス全文をコピーしました（フォールバック）');
+      }
+    });
+
     // 入力イベント
     document.getElementById('diffBtn').addEventListener('click', () => { if (isEditor) renderDiff(); });
     leftInput.addEventListener('input',  () => { if (isEditor) saveActiveTab(); });
@@ -269,13 +291,13 @@
       if (!isEditor) return;
       const t = tabs.find(x => x.id === activeId);
       if (!t) return;
-      const newName = prompt('新しいタ���名を入力してください', t.name);
+      const newName = prompt('新しいタブ名を入力してください', t.name);
       if (newName && newName.trim()) renameActiveTab(newName.trim());
     });
 
     listTabsBtn.addEventListener('click', () => {
       const list = tabs.map((t, i) => `${i + 1}. ${t.name}`).join('\n');
-      const sel = prompt(`タブ番号を入力するとそのタブに��動します:\n${list}`);
+      const sel = prompt(`タブ番号を入力するとそのタブに移動します:\n${list}`);
       if (!sel) return;
       const idx = Number(sel) - 1;
       if (Number.isInteger(idx) && idx >= 0 && idx < tabs.length) {
