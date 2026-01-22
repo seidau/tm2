@@ -33,7 +33,8 @@
     .add { background: #e0ffe0; color: #0a5c0a; }
     .label { font-weight: bold; margin-bottom: 4px; display: block; }
     .advice-area { margin-top: 16px; display: grid; grid-template-columns: 3fr 1fr; gap: 12px; }
-    .advice-area textarea { min-height: 260px; } /* アドバイス欄を縦長に */
+    .advice-area textarea { min-height: 260px; } /* アドバイス欄を縦長 */
+    .advice-view { padding: 8px; min-height: 260px; background: #fff; border: 1px solid #ccc; white-space: pre-wrap; }
     .score-input { width: 100%; padding: 8px; font-size: 16px; }
     .controls { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
     .readonly-note { margin-bottom: 8px; color: #b00; font-weight: bold; }
@@ -73,6 +74,7 @@
     <div>
       <span class="label">アドバイス</span>
       <textarea id="adviceInput" placeholder="ここにアドバイスを記入"></textarea>
+      <div id="adviceView" class="advice-view"></div>
     </div>
     <div>
       <span class="label">点数</span>
@@ -87,6 +89,7 @@
     const leftResult  = document.getElementById('leftResult');
     const rightResult = document.getElementById('rightResult');
     const adviceInput = document.getElementById('adviceInput');
+    const adviceView  = document.getElementById('adviceView');
     const scoreInput  = document.getElementById('scoreInput');
 
     const tabBar        = document.getElementById('tabBar');
@@ -106,7 +109,6 @@
     const isEditor = new URLSearchParams(location.search).get('edit') === '1';
     if (!isEditor) {
       readonlyNote.style.display = 'block';
-      // 編集不可にするが、アドバイス・点数は薄くしないよう readOnly + CSS
       [leftInput, rightInput, newTabName].forEach(el => el.disabled = true);
       [addTabBtn, diffBtn, renameTabBtn, deleteAllBtn, exportBtn].forEach(el => el.disabled = true);
       [adviceInput, scoreInput].forEach(el => {
@@ -204,6 +206,7 @@
       rightInput.value  = t.right;
       adviceInput.value = t.advice;
       scoreInput.value  = t.score;
+      updateAdviceView();
       renderDiff();
     }
 
@@ -244,11 +247,15 @@
       }[s]));
     }
 
+    function updateAdviceView() {
+      adviceView.textContent = adviceInput.value;
+    }
+
     // 入力イベント
     document.getElementById('diffBtn').addEventListener('click', () => { if (isEditor) renderDiff(); });
     leftInput.addEventListener('input',  () => { if (isEditor) saveActiveTab(); });
     rightInput.addEventListener('input', () => { if (isEditor) saveActiveTab(); });
-    adviceInput.addEventListener('input',() => { if (isEditor) saveActiveTab(); });
+    adviceInput.addEventListener('input',() => { if (isEditor) { saveActiveTab(); updateAdviceView(); } });
     scoreInput.addEventListener('input', () => { if (isEditor) saveActiveTab(); });
 
     addTabBtn.addEventListener('click', () => {
@@ -262,13 +269,13 @@
       if (!isEditor) return;
       const t = tabs.find(x => x.id === activeId);
       if (!t) return;
-      const newName = prompt('新しいタブ名を入力してください', t.name);
+      const newName = prompt('新しいタ���名を入力してください', t.name);
       if (newName && newName.trim()) renameActiveTab(newName.trim());
     });
 
     listTabsBtn.addEventListener('click', () => {
       const list = tabs.map((t, i) => `${i + 1}. ${t.name}`).join('\n');
-      const sel = prompt(`タブ番号を入力するとそのタブに移動します:\n${list}`);
+      const sel = prompt(`タブ番号を入力するとそのタブに��動します:\n${list}`);
       if (!sel) return;
       const idx = Number(sel) - 1;
       if (Number.isInteger(idx) && idx >= 0 && idx < tabs.length) {
